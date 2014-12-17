@@ -113,6 +113,7 @@ struct OperatorClass {
   Type type;
 
   OperatorClass(const char* o, bool r, Type t) : ops(o), rtl(r), type(t) {}
+  OperatorClass(OperatorClass&& rhs) : ops(std::move(rhs.ops)), rtl(rhs.rtl), type(rhs.type) {}
 
   static int getPrecedence(Type type, IString op);
   static bool getRtl(int prec);

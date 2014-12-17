@@ -2,6 +2,7 @@
 
 #include <unordered_set>
 #include <unordered_map>
+#include <memory>
 
 #include <string.h>
 #include <stdint.h>
@@ -43,21 +44,23 @@ struct IString {
 
   void set(const char *s, bool reuse=true) {
     typedef std::unordered_set<const char *, CStringHash, CStringEqual> StringSet;
-    static StringSet* strings = new StringSet();
+    static StringSet strings;
+    typedef std::vector<std::unique_ptr<char[]>> AllocVector;
+    static AllocVector allocs;
 
     if (reuse) {
-      auto result = strings->insert(s); // if already present, does nothing
+      auto result = strings.insert(s); // if already present, does nothing
       str = *(result.first);
     } else {
-      auto existing = strings->find(s);
-      if (existing == strings->end()) {
-        char *copy = (char*)malloc(strlen(s)+1); // XXX leaked
-        strcpy(copy, s);
-        s = copy;
+      auto existing = strings.find(s);
+      if (existing == strings.end()) {
+        allocs.emplace_back(new char[strlen(s)+1]);
+        strcpy(allocs.back().get(), s);
+        s = allocs.back().get();
       } else {
         s = *existing;
       }
-      strings->insert(s);
+      strings.insert(s);
       str = s;
     }
   }
@@ -117,11 +120,13 @@ namespace cashew {
 // IStringSet
 
 class IStringSet : public std::unordered_set<IString> {
+  std::vector<std::unique_ptr<char[]>> allocs;
 public:
   IStringSet() {}
   IStringSet(const char *init) { // comma-delimited list
     int size = strlen(init);
-    char *curr = (char*)malloc(size+1); // leaked!
+    allocs.emplace_back(new char[size+1]);
+    char *curr = allocs.back().get();
     strcpy(curr, init);
     while (1) {
       char *end = strchr(curr, ' ');
