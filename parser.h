@@ -316,10 +316,10 @@ class Parser {
 
   NodeRef parseFrag(Frag& frag) {
     switch (frag.type) {
-      case IDENT:  return Builder::makeName(frag.str);
-      case STRING: return Builder::makeString(frag.str);
-      case INT:    return Builder::makeInt(uint32_t(frag.num));
-      case DOUBLE: return Builder::makeDouble(frag.num);
+      case IDENT:  return builder.makeName(frag.str);
+      case STRING: return builder.makeString(frag.str);
+      case INT:    return builder.makeInt(uint32_t(frag.num));
+      case DOUBLE: return builder.makeDouble(frag.num);
       default: assert(0);
     }
     return nullptr;
@@ -351,7 +351,7 @@ class Parser {
       assert(name.type == SEPARATOR && name.str[0] == '(');
       name.str = IString();
     }
-    NodeRef ret = Builder::makeFunction(name.str);
+    NodeRef ret = builder.makeFunction(name.str);
     src = skipSpace(src);
     assert(*src == '(');
     src++;
@@ -361,7 +361,7 @@ class Parser {
       Frag arg(src);
       assert(arg.type == IDENT);
       src += arg.size;
-      Builder::appendArgumentToFunction(ret, arg.str);
+      builder.appendArgumentToFunction(ret, arg.str);
       src = skipSpace(src);
       if (*src && *src == ')') break;
       if (*src && *src == ',') {
@@ -378,7 +378,7 @@ class Parser {
   }
 
   NodeRef parseVar(Frag& frag, char*& src, const char* seps) {
-    NodeRef ret = Builder::makeVar(frag.str == CONST);
+    NodeRef ret = builder.makeVar(frag.str == CONST);
     while (1) {
       src = skipSpace(src);
       if (*src == ';') break;
@@ -392,7 +392,7 @@ class Parser {
         src = skipSpace(src);
         value = parseElement(src, ";,");
       }
-      Builder::appendToVar(ret, name.str, value);
+      builder.appendToVar(ret, name.str, value);
       src = skipSpace(src);
       if (*src && *src == ';') break;
       if (*src && *src == ',') {
@@ -412,7 +412,7 @@ class Parser {
     src = skipSpace(src);
     assert(hasChar(seps, *src));
     if (*src == ';') src++;
-    return Builder::makeReturn(value);
+    return builder.makeReturn(value);
   }
 
   NodeRef parseIf(Frag& frag, char*& src, const char* seps) {
@@ -427,7 +427,7 @@ class Parser {
         ifFalse = parseMaybeBracketed(src, seps);
       }
     }
-    return Builder::makeIf(condition, ifTrue, ifFalse);
+    return builder.makeIf(condition, ifTrue, ifFalse);
   }
 
   NodeRef parseDo(Frag& frag, char*& src, const char* seps) {
@@ -437,31 +437,31 @@ class Parser {
     assert(next.type == KEYWORD && next.str == WHILE);
     src += next.size;
     NodeRef condition = parseParenned(src);
-    return Builder::makeDo(body, condition);
+    return builder.makeDo(body, condition);
   }
 
   NodeRef parseWhile(Frag& frag, char*& src, const char* seps) {
     NodeRef condition = parseParenned(src);
     NodeRef body = parseMaybeBracketed(src, seps);
-    return Builder::makeWhile(condition, body);
+    return builder.makeWhile(condition, body);
   }
 
   NodeRef parseBreak(Frag& frag, char*& src, const char* seps) {
     src = skipSpace(src);
     Frag next(src);
     if (next.type == IDENT) src += next.size;
-    return Builder::makeBreak(next.type == IDENT ? next.str : IString());
+    return builder.makeBreak(next.type == IDENT ? next.str : IString());
   }
 
   NodeRef parseContinue(Frag& frag, char*& src, const char* seps) {
     src = skipSpace(src);
     Frag next(src);
     if (next.type == IDENT) src += next.size;
-    return Builder::makeContinue(next.type == IDENT ? next.str : IString());
+    return builder.makeContinue(next.type == IDENT ? next.str : IString());
   }
 
   NodeRef parseSwitch(Frag& frag, char*& src, const char* seps) {
-    NodeRef ret = Builder::makeSwitch(parseParenned(src));
+    NodeRef ret = builder.makeSwitch(parseParenned(src));
     src = skipSpace(src);
     assert(*src == '{');
     src++;
@@ -486,17 +486,17 @@ class Parser {
             src = skipSpace(src);
             Frag value2(src);
             assert(value2.isNumber());
-            arg = Builder::makePrefix(MINUS, parseFrag(value2));
+            arg = builder.makePrefix(MINUS, parseFrag(value2));
             src += value2.size;
           }
-          Builder::appendCaseToSwitch(ret, arg);
+          builder.appendCaseToSwitch(ret, arg);
           src = skipSpace(src);
           assert(*src == ':');
           src++;
           continue;
         } else if (next.str == DEFAULT) {
           src += next.size;
-          Builder::appendDefaultToSwitch(ret);
+          builder.appendDefaultToSwitch(ret);
           src = skipSpace(src);
           assert(*src == ':');
           src++;
@@ -507,7 +507,7 @@ class Parser {
       // not case X: or default: or }, so must be some code
       src = skipSpace(src);
       bool explicitBlock = *src == '{';
-      Builder::appendCodeToSwitch(ret, parseMaybeBracketedBlock(src, ";}", CASE, DEFAULT), explicitBlock);
+      builder.appendCodeToSwitch(ret, parseMaybeBracketedBlock(src, ";}", CASE, DEFAULT), explicitBlock);
     }
     src = skipSpace(src);
     assert(*src == '}');
@@ -516,7 +516,7 @@ class Parser {
   }
 
   NodeRef parseNew(Frag& frag, char*& src, const char* seps) {
-    return Builder::makeNew(parseElement(src, seps));
+    return builder.makeNew(parseElement(src, seps));
   }
 
   NodeRef parseAfterIdent(Frag& frag, char*& src, const char* seps) {
@@ -532,7 +532,7 @@ class Parser {
       } else {
         inner = parseElement(src, seps);
       }
-      return Builder::makeLabel(frag.str, inner);
+      return builder.makeLabel(frag.str, inner);
     }
     if (*src == '.') return parseExpression(parseDotting(parseFrag(frag), src), src, seps);
     return parseExpression(parseFrag(frag), src, seps);
@@ -542,11 +542,11 @@ class Parser {
     expressionPartsStack.resize(expressionPartsStack.size()+1);
     assert(*src == '(');
     src++;
-    NodeRef ret = Builder::makeCall(target);
+    NodeRef ret = builder.makeCall(target);
     while (1) {
       src = skipSpace(src);
       if (*src == ')') break;
-      Builder::appendToCall(ret, parseElement(src, ",)"));
+      builder.appendToCall(ret, parseElement(src, ",)"));
       src = skipSpace(src);
       if (*src && *src == ')') break;
       if (*src && *src == ',') {
@@ -565,7 +565,7 @@ class Parser {
     expressionPartsStack.resize(expressionPartsStack.size()+1);
     assert(*src == '[');
     src++;
-    NodeRef ret = Builder::makeIndexing(target, parseElement(src, "]"));
+    NodeRef ret = builder.makeIndexing(target, parseElement(src, "]"));
     src = skipSpace(src);
     assert(*src == ']');
     src++;
@@ -580,7 +580,7 @@ class Parser {
     Frag key(src);
     assert(key.type == IDENT);
     src += key.size;
-    return Builder::makeDot(target, key.str);
+    return builder.makeDot(target, key.str);
   }
 
   NodeRef parseAfterParen(char*& src) {
@@ -597,13 +597,13 @@ class Parser {
 
   NodeRef parseAfterBrace(char*& src) {
     expressionPartsStack.resize(expressionPartsStack.size()+1);
-    NodeRef ret = Builder::makeArray();
+    NodeRef ret = builder.makeArray();
     while (1) {
       src = skipSpace(src);
       assert(*src);
       if (*src == ']') break;
       NodeRef element = parseElement(src, ",]");
-      Builder::appendToArray(ret, element);
+      builder.appendToArray(ret, element);
       src = skipSpace(src);
       if (*src == ',') {
         src++;
@@ -617,7 +617,7 @@ class Parser {
 
   NodeRef parseAfterCurly(char*& src) {
     expressionPartsStack.resize(expressionPartsStack.size()+1);
-    NodeRef ret = Builder::makeObject();
+    NodeRef ret = builder.makeObject();
     while (1) {
       src = skipSpace(src);
       assert(*src);
@@ -629,7 +629,7 @@ class Parser {
       assert(*src == ':');
       src++;
       NodeRef value = parseElement(src, ",}");
-      Builder::appendToObject(ret, key.str, value);
+      builder.appendToObject(ret, key.str, value);
       src = skipSpace(src);
       if (*src == ',') {
         src++;
@@ -685,9 +685,9 @@ class Parser {
 
   NodeRef makeBinary(NodeRef left, IString op, NodeRef right) {
     if (op == PERIOD) {
-      return Builder::makeDot(left, right);
+      return builder.makeDot(left, right);
     } else {
-      return Builder::makeBinary(left, op ,right);
+      return builder.makeBinary(left, op ,right);
     }
   }
 
@@ -742,7 +742,7 @@ class Parser {
               parts.erase(parts.begin() + i - 1);
             } else if (ops.type == OperatorClass::Prefix && i < (int)parts.size()-1) {
               if (i > 0 && parts[i-1].isNode) continue; // cannot apply prefix operator if it would join two nodes
-              parts[i] = Builder::makePrefix(op, parts[i+1].getNode());
+              parts[i] = builder.makePrefix(op, parts[i+1].getNode());
               parts.erase(parts.begin() + i + 1);
             } else if (ops.type == OperatorClass::Tertiary) {
               // we must be at  X ? Y : Z
@@ -751,7 +751,7 @@ class Parser {
               if (op != COLON) continue;
               assert(i < (int)parts.size()-1 && i >= 3);
               if (parts[i-2].getOp() != QUESTION) continue; // e.g. x ? y ? 1 : 0 : 2
-              parts[i-3] = Builder::makeConditional(parts[i-3].getNode(), parts[i-1].getNode(), parts[i+1].getNode());
+              parts[i-3] = builder.makeConditional(parts[i-3].getNode(), parts[i-1].getNode(), parts[i+1].getNode());
               parts.erase(parts.begin() + i - 2, parts.begin() + i + 2);
               i = parts.size(); // basically a reset, due to things like x ? y ? 1 : 0 : 2
             } // TODO: postfix
@@ -769,7 +769,7 @@ class Parser {
               i--;
             } else if (ops.type == OperatorClass::Prefix && i < (int)parts.size()-1) {
               if (i > 0 && parts[i-1].isNode) continue; // cannot apply prefix operator if it would join two nodes
-              parts[i] = Builder::makePrefix(op, parts[i+1].getNode());
+              parts[i] = builder.makePrefix(op, parts[i+1].getNode());
               parts.erase(parts.begin() + i + 1);
               i = std::max(i-2, 0); // allow a previous prefix operator to cascade
             } // TODO: tertiary, postfix
@@ -786,7 +786,7 @@ class Parser {
   // Parses a block of code (e.g. a bunch of statements inside {,}, or the top level of o file)
   NodeRef parseBlock(char*& src, NodeRef block=nullptr, const char* seps=";", IString keywordSep1=IString(), IString keywordSep2=IString()) {
     //dump("parseBlock", src);
-    if (!block) block = Builder::makeBlock();
+    if (!block) block = builder.makeBlock();
     while (*src) {
       src = skipSpace(src);
       if (*src == 0) break;
@@ -804,13 +804,13 @@ class Parser {
         if (next.type == KEYWORD && next.str == keywordSep2) break;
       }
       NodeRef element = parseElementOrStatement(src, seps);
-      Builder::appendToBlock(block, element);
+      builder.appendToBlock(block, element);
     }
     return block;
   }
 
   NodeRef parseBracketedBlock(char*& src, NodeRef block=nullptr) {
-    if (!block) block = Builder::makeBlock();
+    if (!block) block = builder.makeBlock();
     src = skipSpace(src);
     assert(*src == '{');
     src++;
@@ -824,12 +824,12 @@ class Parser {
     src = skipSpace(src);
     if (*src == ';') {
       src++;
-      return Builder::makeBlock(); // we don't need the brackets here, but oh well
+      return builder.makeBlock(); // we don't need the brackets here, but oh well
     }
     NodeRef ret = parseElement(src, seps);
     src = skipSpace(src);
     if (*src == ';') {
-      ret = Builder::makeStatement(ret);
+      ret = builder.makeStatement(ret);
       src++;
     }
     return ret;
@@ -884,9 +884,12 @@ class Parser {
     fprintf(stderr, "\n\n");
   }
 
+  Builder builder;
+
 public:
 
-  Parser() : allSource(nullptr), allSize(0) {
+  template <typename... Args>
+  Parser(Args&&... args) : allSource(nullptr), allSize(0), builder(std::forward<Args>(args)...) {
     expressionPartsStack.resize(1);
   }
 
@@ -894,7 +897,7 @@ public:
   NodeRef parseToplevel(char* src) {
     allSource = src;
     allSize = strlen(src);
-    return parseBlock(src, Builder::makeToplevel());
+    return parseBlock(src, builder.makeToplevel());
   }
 };
 
